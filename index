@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Service Yield Calculator</title>
+<style>
+  :root {
+    --paper: #eef1f4;
+    --panel: #ffffff;
+    --ink: #1b2430;
+    --muted: #5a6675;
+    --line: #c9d1da;
+    --accent: #0f766e;
+    --accent-soft: #d5ece9;
+    --warn: #b45309;
+    --radius: 6px;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font: 16px/1.5 "Avenir Next", "Segoe UI", system-ui, sans-serif;
+  }
+  main { max-width: 980px; margin: 0 auto; padding: 32px 20px 64px; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  h2 { font-size: 1.1rem; margin: 0 0 12px; }
+  .lede { color: var(--muted); margin: 0 0 28px; max-width: 60ch; }
+  section {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 20px;
+    margin-bottom: 20px;
+  }
+  .row { display: flex; flex-wrap: wrap; gap: 16px; }
+  label { display: flex; flex-direction: column; gap: 4px; font-size: 0.9rem; color: var(--muted); }
+  input {
+    font: inherit;
+    color: var(--ink);
+    padding: 8px 10px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: #fff;
+    min-width: 0;
+  }
+  input:focus-visible, button:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+  .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .scroll { overflow-x: auto; }
+  table { border-collapse: collapse; width: 100%; min-width: 720px; }
+  th, td { text-align: left; padding: 6px 8px 6px 0; vertical-align: middle; }
+  th { font-size: 0.85rem; color: var(--muted); font-weight: 600; border-bottom: 1px solid var(--line); }
+  td input { width: 100%; }
+  td.num, th.num { text-align: right; padding-right: 12px; font-variant-numeric: tabular-nums; }
+  .results td { border-bottom: 1px solid var(--line); padding: 10px 12px 10px 0; }
+  .bar { height: 8px; background: var(--accent-soft); border-radius: 4px; min-width: 90px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); border-radius: 4px; }
+  button {
+    font: inherit;
+    padding: 8px 14px;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--ink);
+    cursor: pointer;
+  }
+  button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  button.remove { padding: 6px 10px; color: var(--warn); }
+  .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 16px; }
+  .stat { border-left: 4px solid var(--accent); padding-left: 12px; }
+  .stat b { display: block; font-size: 1.5rem; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 0.9rem; }
+  .note { margin: 14px 0 0; color: var(--muted); font-size: 0.9rem; }
+  .note.warn { color: var(--warn); }
+  @media (prefers-reduced-motion: no-preference) { .bar > span { transition: width 0.25s ease; } }
+</style>
+</head>
+<body>
+<main>
+  <h1>Service yield calculator</h1>
+  <p class="lede">See which services earn the most for each hour of staff time. Enter your capacity and your services, and the results update as you type.</p>
+
+  <section aria-labelledby="cap-h">
+    <h2 id="cap-h">Capacity</h2>
+    <div class="row">
+      <label>Staff
+        <input id="staff" type="number" min="1" step="1" value="3">
+      </label>
+      <label>Working hours per person each week
+        <input id="hours" type="number" min="1" step="0.5" value="40">
+      </label>
+      <label>Currency symbol
+        <input id="cur" type="text" maxlength="4" value="$" style="width:90px">
+      </label>
+    </div>
+  </section>
+
+  <section aria-labelledby="svc-h">
+    <h2 id="svc-h">Services</h2>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th>Price per job</th>
+            <th>Cost per job</th>
+            <th>Minutes per job</th>
+            <th>Jobs per week</th>
+            <th><span class="sr">Remove</span></th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <p><button id="add" class="primary" type="button">Add service</button></p>
+  </section>
+
+  <section aria-labelledby="sum-h">
+    <h2 id="sum-h">Overall yield</h2>
+    <div class="summary" id="summary"></div>
+    <p class="note" id="note"></p>
+  </section>
+
+  <section aria-labelledby="res-h">
+    <h2 id="res-h">Profit per hour, by service</h2>
+    <div class="scroll">
+      <table class="results">
+        <thead>
+          <tr>
+            <th>Service</th>
+            <th class="num">Weekly revenue</th>
+            <th class="num">Weekly profit</th>
+            <th class="num">Profit per hour</th>
+            <th>Compared with the best</th>
+          </tr>
+        </thead>
+        <tbody id="out"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<script>
+(function () {
+  var samples = [
+    { name: "Standard repair", price: 120, cost: 30, mins: 60, jobs: 20 },
+    { name: "Installation", price: 450, cost: 210, mins: 180, jobs: 6 },
+    { name: "Quick inspection", price: 45, cost: 5, mins: 20, jobs: 25 }
+  ];
+
+  var rowsEl = document.getElementById("rows");
+  var outEl = document.getElementById("out");
+  var sumEl = document.getElementById("summary");
+  var noteEl = document.getElementById("note");
+  var staffEl = document.getElementById("staff");
+  var hoursEl = document.getElementById("hours");
+  var curEl = document.getElementById("cur");
+
+  function num(v) { var n = parseFloat(v); return isFinite(n) && n > 0 ? n : 0; }
+
+  function money(n) {
+    var c = curEl.value || "";
+    var sign = n < 0 ? "-" : "";
+    return sign + c + Math.abs(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
+  }
+
+  function cell(tag, className, text) {
+    var el = document.createElement(tag);
+    if (className) el.className = className;
+    if (text !== undefined) el.textContent = text;
+    return el;
+  }
+
+  function addRow(s) {
+    var tr = document.createElement("tr");
+    var fields = [
+      ["name", "text", s.name],
+      ["price", "number", s.price],
+      ["cost", "number", s.cost],
+      ["mins", "number", s.mins],
+      ["jobs", "number", s.jobs]
+    ];
+    fields.forEach(function (f) {
+      var td = document.createElement("td");
+      var input = document.createElement("input");
+      input.type = f[1];
+      input.value = f[2];
+      input.dataset.field = f[0];
+      input.setAttribute("aria-label", f[0]);
+      if (f[1] === "number") { input.min = "0"; input.step = "any"; }
+      input.addEventListener("input", render);
+      td.appendChild(input);
+      tr.appendChild(td);
+    });
+    var td = document.createElement("td");
+    var btn = cell("button", "remove", "Remove");
+    btn.type = "button";
+    btn.addEventListener("click", function () { tr.remove(); render(); });
+    td.appendChild(btn);
+    tr.appendChild(td);
+    rowsEl.appendChild(tr);
+  }
+
+  function readServices() {
+    return Array.prototype.map.call(rowsEl.children, function (tr) {
+      var get = function (f) { return tr.querySelector('[data-field="' + f + '"]').value; };
+      return {
+        name: get("name") || "Untitled service",
+        price: num(get("price")),
+        cost: num(get("cost")),
+        mins: num(get("mins")),
+        jobs: num(get("jobs"))
+      };
+    });
+  }
+
+  function stat(value, label) {
+    var d = cell("div", "stat");
+    d.appendChild(cell("b", "", value));
+    d.appendChild(cell("span", "", label));
+    return d;
+  }
+
+  function render() {
+    var services = readServices();
+    var available = num(staffEl.value) * num(hoursEl.value);
+    var revenue = 0, profit = 0, booked = 0;
+
+    var rows = services.map(function (s) {
+      var hours = (s.mins / 60) * s.jobs;
+      var rev = s.price * s.jobs;
+      var prof = (s.price - s.cost) * s.jobs;
+      revenue += rev; profit += prof; booked += hours;
+      return {
+        name: s.name, rev: rev, prof: prof,
+        perHour: hours > 0 ? prof / hours : 0
+      };
+    });
+
+    var utilization = available > 0 ? booked / available : 0;
+    var yieldAvail = available > 0 ? profit / available : 0;
+    var yieldBooked = booked > 0 ? profit / booked : 0;
+
+    sumEl.textContent = "";
+    sumEl.appendChild(stat(money(yieldAvail), "Profit per available hour"));
+    sumEl.appendChild(stat(money(yieldBooked), "Profit per booked hour"));
+    sumEl.appendChild(stat(Math.round(utilization * 100) + "%", "Capacity in use"));
+    sumEl.appendChild(stat(money(profit), "Weekly profit (" + money(revenue) + " revenue)"));
+
+    noteEl.className = "note";
+    if (available <= 0) {
+      noteEl.textContent = "Enter staff and weekly hours to see capacity figures.";
+      noteEl.className = "note warn";
+    } else if (utilization > 1) {
+      noteEl.textContent = "Booked hours exceed available hours by " + Math.round((utilization - 1) * 100) + "%. Reduce jobs per week or add staff.";
+      noteEl.className = "note warn";
+    } else {
+      var idle = available - booked;
+      noteEl.textContent = idle.toFixed(1) + " available hours are unbooked. Filling them at your profit per booked hour would add about " + money(idle * yieldBooked) + " each week.";
+    }
+
+    var best = rows.reduce(function (m, r) { return Math.max(m, r.perHour); }, 0);
+    var sorted = rows.slice().sort(function (a, b) { return b.perHour - a.perHour; });
+
+    outEl.textContent = "";
+    sorted.forEach(function (r) {
+      var tr = document.createElement("tr");
+      tr.appendChild(cell("td", "", r.name));
+      tr.appendChild(cell("td", "num", money(r.rev)));
+      tr.appendChild(cell("td", "num", money(r.prof)));
+      tr.appendChild(cell("td", "num", money(r.perHour)));
+      var td = document.createElement("td");
+      var bar = cell("div", "bar");
+      var fill = document.createElement("span");
+      fill.style.width = (best > 0 ? Math.max(0, r.perHour) / best * 100 : 0) + "%";
+      bar.appendChild(fill);
+      td.appendChild(bar);
+      tr.appendChild(td);
+      outEl.appendChild(tr);
+    });
+  }
+
+  document.getElementById("add").addEventListener("click", function () {
+    addRow({ name: "", price: 0, cost: 0, mins: 60, jobs: 0 });
+    render();
+  });
+  [staffEl, hoursEl, curEl].forEach(function (el) { el.addEventListener("input", render); });
+
+  samples.forEach(addRow);
+  render();
+})();
+</script>
+</body>
+</html>
